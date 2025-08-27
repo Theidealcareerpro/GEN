@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { getFingerprint } from "@/lib/client/fp";
+import { fingerprint } from "@/lib/fingerprint";
 
 export default function RedeemSupporterPage() {
   const [fp, setFp] = React.useState("");
@@ -13,11 +13,16 @@ export default function RedeemSupporterPage() {
   const [err, setErr] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    const u = new URL(window.location.href);
-    const pref = u.searchParams.get("fp");
-    const m = u.searchParams.get("months");
-    setFp(pref || getFingerprint());
-    if (m === "6") setMonths(6); else setMonths(3);
+    (async () => {
+      try {
+        const u = new URL(window.location.href);
+        const pref = u.searchParams.get("fp");
+        const m = u.searchParams.get("months");
+        const f = await fingerprint();
+        setFp(pref || f);
+        if (m === "6") setMonths(6); else setMonths(3);
+      } catch {}
+    })();
   }, []);
 
   async function redeem() {
