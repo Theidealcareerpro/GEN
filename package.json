@@ -3,8 +3,11 @@
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.0.0",
-  "engines": { "node": "20.x" },
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
+    "prebuild": "pnpm rebuild esbuild unrs-resolver || true",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
@@ -36,5 +39,11 @@
     "tailwindcss": "3.4.10",
     "postcss": "8.4.41",
     "autoprefixer": "10.4.20"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "unrs-resolver"
+    ]
   }
 }
