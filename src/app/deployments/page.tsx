@@ -1,8 +1,8 @@
 "use client";
 
 import * as React from "react";
+import { fingerprint } from "@/lib/fingerprint";
 import { getUsage, createExtendCheckout } from "@/lib/client/api";
-import { getFingerprint } from "@/lib/client/fp";
 
 type Item = {
   id: string;
@@ -21,23 +21,25 @@ export default function DeploymentsPage() {
   const [items, setItems] = React.useState<Item[]>([]);
   const [meta, setMeta] = React.useState<any>(null);
 
-  async function load() {
-    setLoading(true); setErr(null);
-    try {
-      const f = getFingerprint(); setFp(f);
-      const res = await fetch("/api/usage", { headers: { "x-fp": f } });
-      if (!res.ok) throw new Error("Failed to fetch usage");
-      const j = await res.json();
-      setItems(j.items || []);
-      setMeta(j);
-    } catch (e: any) {
-      setErr(e?.message || "Failed to load");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  React.useEffect(() => { load(); }, []);
+  React.useEffect(() => {
+    (async () => {
+      setLoading(true); setErr(null);
+      try {
+        const f = await fingerprint();
+        setFp(f);
+        // Use consolidated usage endpoint (returns deployments + entitlements)
+        const res = await fetch("/api/usage", { headers: { "x-fp": f } });
+        if (!res.ok) throw new Error("Failed to fetch usage");
+        const j = await res.json();
+        setItems(j.items || []);
+        setMeta(j);
+      } catch (e: any) {
+        setErr(e?.message || "Failed to load");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
 
   async function goBusiness(plan: "3m" | "6m") {
     try {
