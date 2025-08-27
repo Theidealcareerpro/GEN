@@ -1,88 +1,78 @@
 "use client";
 
 import * as React from "react";
-import { fingerprint } from "@/lib/fingerprint";
-
-export const metadata = {
-  title: "Redeem Supporter — TheIdealProGen",
-};
+import { getFingerprint } from "@/lib/client/fp";
 
 export default function RedeemSupporterPage() {
   const [fp, setFp] = React.useState("");
+  const [months, setMonths] = React.useState<3 | 6>(3);
   const [receipt, setReceipt] = React.useState("");
-  const [loading, setLoading] = React.useState(false);
-  const [ok, setOk] = React.useState<null | { expires_at: string }>(null);
+  const [code, setCode] = React.useState("");
+  const [busy, setBusy] = React.useState(false);
+  const [msg, setMsg] = React.useState<string | null>(null);
   const [err, setErr] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    fingerprint().then(setFp).catch(() => {});
+    const u = new URL(window.location.href);
+    const pref = u.searchParams.get("fp");
+    const m = u.searchParams.get("months");
+    setFp(pref || getFingerprint());
+    if (m === "6") setMonths(6); else setMonths(3);
   }, []);
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setErr(null);
-    setOk(null);
-    setLoading(true);
+  async function redeem() {
+    setBusy(true); setMsg(null); setErr(null);
     try {
-      const res = await fetch("/api/supporter/redeem", {
+      const res = await fetch("/api/redeem/supporter", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ fingerprint: fp, receipt }),
+        body: JSON.stringify({ fingerprint: fp, months, external_id: receipt, code }),
       });
       const j = await res.json();
-      if (!res.ok || !j.ok) throw new Error(j?.error || "Redeem failed");
-      setOk({ expires_at: j.expires_at });
+      if (!res.ok) throw new Error(j?.error || "Redeem failed");
+      setMsg("Success! Entitlements extended.");
     } catch (e: any) {
       setErr(e?.message || "Redeem failed");
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
   }
 
   return (
     <div className="space-y-4" id="main">
-      <h1 className="text-2xl font-semibold">Redeem Supporter</h1>
-      <p className="text-sm text-neutral-400">
-        If your Buy Me a Coffee payment didn’t link automatically, paste your <strong>receipt / transaction ID</strong> here.
-        We’ll grant Supporter (90 days) to your current device.
-      </p>
+      <h1 className="text-2xl font-semibold">Supporter Redeem</h1>
+      <p className="text-sm text-neutral-400">Manual redemption when BMC can’t pass the fingerprint.</p>
 
-      {ok && (
-        <div className="rounded-xl border border-emerald-700 bg-emerald-900/30 text-emerald-200 p-3">
-          Success! Your Supporter plan is active. New expiry: {new Date(ok.expires_at).toLocaleString()}.
+      <section className="card p-4 space-y-3">
+        <div className="grid sm:grid-cols-2 gap-2">
+          <div>
+            <div className="text-sm text-neutral-400 mb-1">Fingerprint</div>
+            <input className="input" value={fp} onChange={e => setFp(e.target.value)} />
+          </div>
+          <div>
+            <div className="text-sm text-neutral-400 mb-1">Months</div>
+            <select className="input" value={months} onChange={e => setMonths(Number(e.target.value) as 3 | 6)}>
+              <option value={3}>3 months (£5)</option>
+              <option value={6}>6 months (£10)</option>
+            </select>
+          </div>
         </div>
-      )}
-      {err && <div className="rounded-xl border border-red-700 bg-red-900/30 text-red-200 p-3">{err}</div>}
-
-      <form onSubmit={submit} className="space-y-3 max-w-xl">
         <div>
-          <label className="block mb-1 text-sm text-neutral-400">BMC Receipt / Transaction ID</label>
-          <input
-            className="w-full px-3 py-2 rounded-xl border border-neutral-700 bg-neutral-900 text-neutral-100"
-            placeholder="e.g. C_ABC123XYZ"
-            value={receipt}
-            onChange={(e) => setReceipt(e.target.value)}
-            required
-          />
+          <div className="text-sm text-neutral-400 mb-1">Receipt / Reference</div>
+          <input className="input" placeholder="Paste BMC receipt ID, email, or note" value={receipt} onChange={e => setReceipt(e.target.value)} />
         </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            className="px-3 py-2 rounded-xl border border-neutral-700 bg-indigo-600 text-white disabled:opacity-50"
-            type="submit"
-            disabled={loading || !receipt}
-          >
-            {loading ? "Redeeming…" : "Redeem"}
-          </button>
-          <a className="px-3 py-2 rounded-xl border border-neutral-700" href="/deployments">
-            Go to My Deployments
-          </a>
+        <div>
+          <div className="text-sm text-neutral-400 mb-1">Redeem code</div>
+          <input className="input" placeholder="Admin redeem code" value={code} onChange={e => setCode(e.target.value)} />
+          <p className="text-xs text-neutral-500">Ask the site owner for a one-time code after they verify your receipt.</p>
         </div>
-
-        <p className="text-xs text-neutral-500">
-          We match your receipt in our records and bind it to your device (fingerprint: {fp ? fp.slice(0, 8) : "…"}).
-        </p>
-      </form>
+        <div className="flex gap-2">
+          <button className="btn btn-primary" onClick={redeem} disabled={busy || !fp || !receipt || !code}>{busy ? "Redeeming…" : "Redeem"}</button>
+          <a className="btn" href="/deployments">Go to My Deployments</a>
+        </div>
+        {msg ? <div className="text-emerald-400 text-sm">{msg}</div> : null}
+        {err ? <div className="text-red-400 text-sm">{err}</div> : null}
+      </section>
     </div>
   );
 }
