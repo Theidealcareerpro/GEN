@@ -1,0 +1,91 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Base resets & typography */
+@layer base {
+  :root {
+    --radius: 12px;
+  }
+
+  html, body {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-neutral-950 text-neutral-100 antialiased;
+  }
+
+  /* Smooth fonts on macOS and Windows */
+  body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Headings rhythm */
+  h1 { @apply text-2xl font-semibold tracking-tight; }
+  h2 { @apply text-xl font-semibold; }
+  h3 { @apply text-lg font-medium; }
+}
+
+/* Reusable components/utilities for consistent UI */
+@layer components {
+  /* Global input utility (requested) */
+  .input {
+    @apply w-full px-3 py-2 rounded-xl border border-neutral-700 bg-neutral-900 text-neutral-100 placeholder-neutral-500 outline-none
+           focus-visible:ring-2 focus-visible:ring-indigo-600/60 focus-visible:border-indigo-600/60;
+  }
+
+  .textarea {
+    @apply input min-h-[6rem];
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-neutral-700 px-3 py-2 transition
+           hover:bg-neutral-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600/60;
+  }
+
+  .btn-primary {
+    @apply btn border-indigo-600 bg-indigo-600 text-white hover:bg-indigo-500;
+  }
+
+  .btn-ghost {
+    @apply btn bg-transparent;
+  }
+
+  .navlink {
+    @apply text-sm text-neutral-300 hover:text-white px-2 py-1 rounded-md hover:bg-neutral-900 transition;
+  }
+
+  .card {
+    @apply rounded-2xl border border-neutral-800 bg-neutral-950/60;
+  }
+}
+
+/* Scrollbar (nice but subtle) */
+@layer utilities {
+  .scroll-smooth {
+    scroll-behavior: smooth;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #0b0b0c;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #262626;
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #3a3a3a;
+  }
+}
+
+/* Selection color */
+::selection {
+  background: rgba(79, 70, 229, 0.4); /* indigo-600/40 */
+}
