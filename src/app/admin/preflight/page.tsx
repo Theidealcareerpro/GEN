@@ -1,8 +1,7 @@
-// theidealprogen/src/app/admin/preflight/page.tsx
 "use client";
 
 import * as React from "react";
-import { getFingerprint } from "@/lib/client/fp";
+import { fingerprint } from "@/lib/fingerprint";
 
 export default function AdminPreflightPage() {
   const [fp, setFp] = React.useState("");
@@ -12,7 +11,7 @@ export default function AdminPreflightPage() {
   const [remind, setRemind] = React.useState<any>(null);
   const [err, setErr] = React.useState<string | null>(null);
 
-  React.useEffect(() => { setFp(getFingerprint()); }, []);
+  React.useEffect(() => { fingerprint().then(setFp).catch(() => {}); }, []);
 
   async function pingUsage() {
     setErr(null); setUsage(null);
