@@ -1,28 +1,18 @@
-// theidealprogen/src/app/deploy/success/page.tsx
 "use client";
 
 import * as React from "react";
-import { getFingerprint } from "@/lib/client/fp";
+import { fingerprint } from "@/lib/fingerprint";
 import { createExtendCheckout } from "@/lib/client/api";
 
-export default function DeploySuccessPage({
-  searchParams,
-}: {
-  searchParams?: { url?: string; repo?: string };
-}) {
+export default function DeploySuccessPage({ searchParams }: { searchParams?: { url?: string; repo?: string } }) {
   const url = searchParams?.url || "";
   const repo = searchParams?.repo || "";
-  const fp = getFingerprint();
+  const [fp, setFp] = React.useState("");
 
-  function copy() {
-    if (!url) return;
-    navigator.clipboard?.writeText(url);
-  }
+  React.useEffect(() => { fingerprint().then(setFp).catch(() => {}); }, []);
 
-  function openNew() {
-    if (!url) return;
-    window.open(url, "_blank", "noopener,noreferrer");
-  }
+  function copy() { if (url) navigator.clipboard?.writeText(url); }
+  function openNew() { if (url) window.open(url, "_blank", "noopener,noreferrer"); }
 
   function supporter(months: 3 | 6) {
     const u = new URL(window.location.origin + "/supporter/redeem");
@@ -35,9 +25,7 @@ export default function DeploySuccessPage({
     try {
       const { url: checkout } = await createExtendCheckout({ fingerprint: fp, plan, tier: "business" });
       if (checkout) window.location.href = checkout;
-    } catch (e: any) {
-      alert(e?.message || "Checkout failed");
-    }
+    } catch (e: any) { alert(e?.message || "Checkout failed"); }
   }
 
   return (
