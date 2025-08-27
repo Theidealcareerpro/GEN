@@ -50,6 +50,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link className="navlink" href="/portfolio">
                 Portfolio
               </Link>
+              <Link className="navlink" href="/cv">
+                Cv
+              </Link>
+              <Link className="navlink" href="/cover-letter">
+                Cover Letter
+              </Link>
               <Link className="navlink" href="/deployments">
                 My Deployments
               </Link>
