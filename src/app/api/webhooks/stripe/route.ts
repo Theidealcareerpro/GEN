@@ -1,48 +1,93 @@
-// theidealprogen/src/app/api/webhooks/stripe/route.ts
+// App Router compatible Stripe webhook (Next 13/14)
+// - No `export const config`
+// - Uses raw body via req.text()
+// - Node.js runtime, dynamic (no caching)
+
 import { NextRequest, NextResponse } from "next/server";
-import { stripe } from "@/lib/server/stripe";
-import { env } from "@/lib/env";
 import Stripe from "stripe";
-import { extendForMonths } from "@/lib/entitlements";
 import { supa } from "@/lib/server/supabase";
+import { extendForMonths } from "@/lib/entitlements";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+const STRIPE_SECRET = process.env.STRIPE_SECRET_KEY || "";
+const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || "";
+
+const stripe = new Stripe(STRIPE_SECRET, {
+  apiVersion: "2024-06-20",
+});
 
 export async function POST(req: NextRequest) {
-  if (!stripe || !env.STRIPE_WEBHOOK_SECRET) return NextResponse.json({ error: "Stripe not configured" }, { status: 500 });
+  if (!STRIPE_WEBHOOK_SECRET) {
+    return NextResponse.json({ error: "Missing STRIPE_WEBHOOK_SECRET" }, { status: 500 });
+  }
 
+  // Get the raw body (required for signature verification)
+  const rawBody = await req.text();
   const sig = req.headers.get("stripe-signature") || "";
-  const raw = await req.text();
 
-  let evt: Stripe.Event;
+  let event: Stripe.Event;
   try {
-    evt = stripe.webhooks.constructEvent(raw, sig, env.STRIPE_WEBHOOK_SECRET);
-  } catch (e: any) {
-    return new NextResponse(`Webhook Error: ${e.message}`, { status: 400 });
+    event = stripe.webhooks.constructEvent(rawBody, sig, STRIPE_WEBHOOK_SECRET);
+  } catch (err: any) {
+    return new NextResponse(`Webhook signature verification failed: ${err?.message || err}`, { status: 400 });
   }
 
-  if (evt.type === "checkout.session.completed") {
-    const session = evt.data.object as Stripe.Checkout.Session;
-    const fp = (session.metadata?.fingerprint || "").slice(0, 120);
-    const plan = session.metadata?.plan as "3m" | "6m";
-    const tier = (session.metadata?.tier as "supporter" | "business") || "supporter";
-    const months = plan === "6m" ? 6 : 3;
+  try {
+    switch (event.type) {
+      case "checkout.session.completed": {
+        const session = event.data.object as Stripe.Checkout.Session;
+        const meta = (session.metadata || {}) as Record<string, string>;
 
-    if (fp) {
-      await extendForMonths(fp, months, tier);
+        // We set these when creating the Checkout Session server-side:
+        // metadata: { fingerprint, plan: '3m' | '6m', tier: 'business' }
+        const fingerprint = meta.fingerprint || "";
+        const plan = (meta.plan === "6m" ? "6m" : "3m") as "3m" | "6m";
+        const months = plan === "6m" ? 6 : 3;
 
-      // record payment
-      await supa.from("payments").insert({
-        provider: "stripe",
-        external_id: session.id,
-        fingerprint: fp,
-        plan: `${tier}-${plan}`,
-        months,
-        amount_cents: (session.amount_total || 0),
-        currency: (session.currency || "gbp").toUpperCase(),
-      });
+        if (!fingerprint) {
+          // Nothing to extend; acknowledge to avoid retries but log it
+          console.warn("Stripe webhook: missing fingerprint in metadata");
+          break;
+        }
+
+        // Grant entitlements
+        await extendForMonths(fingerprint, months, "business");
+
+        // Record payment (idempotent on provider+external_id)
+        const external_id = session.id;
+        const amount_cents =
+          typeof session.amount_total === "number" ? session.amount_total : (session.amount_subtotal as number) || 0;
+        const currency = (session.currency || "gbp").toUpperCase();
+
+        const { error } = await supa.from("payments").insert({
+          provider: "stripe",
+          external_id,
+          fingerprint,
+          plan: `business-${plan}`,
+          months,
+          amount_cents,
+          currency,
+        });
+        if (error) {
+          // ignore "duplicate key" conflicts if retried
+          if (!String(error.message || "").toLowerCase().includes("duplicate")) {
+            console.error("payments insert error:", error);
+          }
+        }
+
+        break;
+      }
+
+      default:
+        // Unhandled event types are OK — acknowledge to prevent retries
+        break;
     }
+
+    return NextResponse.json({ received: true });
+  } catch (err: any) {
+    console.error("Stripe webhook handler error:", err);
+    return NextResponse.json({ error: "Webhook handler failed" }, { status: 500 });
   }
-
-  return NextResponse.json({ received: true });
 }
-
-export const config = { api: { bodyParser: false } }; // Next.js ignores; App Router already gives raw body to text()
